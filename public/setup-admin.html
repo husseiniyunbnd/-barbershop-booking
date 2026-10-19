@@ -1,0 +1,36 @@
+
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ساخت مدیر سایت</title>
+</head>
+<body>
+  <h2>ساخت اولین مدیر سایت</h2>
+
+  <form id="setup-form">
+    <p>
+      <label>رمز محرمانه Render</label><br>
+      <input id="token" type="password" required>
+    </p>
+
+    <p>
+      <label>نام کاربری مدیر</label><br>
+      <input id="username" minlength="3" maxlength="32"
+        pattern="[A-Za-z0-9_.-]{3,32}" required>
+    </p>
+
+    <p>
+      <label>رمز عبور مدیر (حداقل ۱۰ نویسه)</label><br>
+      <input id="password" type="password" minlength="10"
+        maxlength="200" required>
+    </p>
+
+    <button type="submit">ساخت مدیر</button>
+  </form>
+
+  <p id="result"></p>
+  <script src="/js/setup-admin.js" defer></script>
+</body>
+</html>
