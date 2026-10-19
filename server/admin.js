@@ -5,6 +5,7 @@ import { isIsoDate, isTime } from './time.js';
 import { isoToJalaliString, jalaliLong } from '../public/js/jalali.js';
 import { validatePasswordStrength } from './auth.js';
 import { setSettings, getSettings, tx } from './db.js';
+import crypto from 'node:crypto';
 
 const STATUS_FA = { pending_payment: 'در انتظار پرداخت', confirmed: 'قطعی‌شده', cancelled: 'لغوشده', expired: 'منقضی‌شده' };
 const PAY_FA = { unpaid: 'پرداخت‌نشده', paid: 'پرداخت‌شده', failed: 'ناموفق', refunded: 'بازپرداخت‌شده' };
@@ -61,6 +62,50 @@ export function adminRoutes({ db, clock, svc, auth, gateway, sms, config }) {
     setCookie(s.token, s.maxAge);
     return { ok: true, username: s.username, csrf: s.csrf };
   }, { public: true }));
+  
+  r.push(route('POST', '/admin/api/setup', ({ body, ip, hit, req }) => {
+    hit(`admin-setup:${ip}`, 5, 15 * 60_000);
+
+    const expected = process.env.ADMIN_SETUP_TOKEN || '';
+    const supplied = String(req.headers['x-admin-setup-token'] || '');
+    const a = Buffer.from(expected, 'utf8');
+    const b = Buffer.from(supplied, 'utf8');
+
+    if (!expected || a.length !== b.length ||
+        !crypto.timingSafeEqual(a, b)) {
+      throw new AppError(404, 'not_found', 'پیدا نشد.');
+    }
+
+    const count = db.prepare(
+      'SELECT COUNT(*) AS c FROM admin_users'
+    ).get().c;
+
+    if (count > 0) {
+      throw new AppError(
+        409, 'admin_exists',
+        'مدیر قبلاً ساخته شده است.'
+      );
+    }
+
+    const username = String(body?.username ?? '').trim();
+    const password = body?.password;
+
+    if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username)) {
+      throw new ValidationError(
+        { username: 'نام کاربری باید ۳ تا ۳۲ نویسه انگلیسی باشد.' },
+        'نام کاربری نامعتبر است.'
+      );
+    }
+
+    const err = validatePasswordStrength(password);
+    if (err) {
+      throw new ValidationError({ password: err }, err);
+    }
+
+    auth.createAdmin(username, password);
+    return { ok: true, message: 'مدیر ساخته شد.' };
+  }, { public: true }));
+
   r.push(route('POST', '/admin/api/logout', ({ token, clearCookie }) => { auth.logout(token); clearCookie(); return { ok: true }; }, { public: true }));
   r.push(route('GET', '/admin/api/me', ({ session }) => ({ authenticated: !!session, username: session?.username ?? null, csrf: session?.csrf ?? null }), { public: true, soft: true }));
   r.push(route('POST', '/admin/api/password', ({ body, session, clearCookie }) => {
